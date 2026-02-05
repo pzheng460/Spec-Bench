@@ -1,0 +1,50 @@
+Spec-Bench NPU 适配进度跟踪
+============================
+
+Phase 1: 公共层适配
+------------------
+[x] US-1.1 设备检测模块
+[x] US-1.2 环境变量处理
+[x] Git commit: feat(npu): add device detection and utility module (0b6cd5a)
+
+Phase 2: Baseline 适配
+---------------------
+[x] US-2.1 修改 evaluation/eval.py
+[x] US-2.2 修改 evaluation/inference_baseline.py (无需修改，使用 device_map="auto")
+[x] Git commit: feat(npu): adapt baseline inference for NPU (7706065)
+
+Phase 3: EAGLE 适配
+------------------
+[x] US-3.1 修改 model/eagle/ea_model.py (无需修改，使用 device_map="auto")
+[x] US-3.2 修改 model/eagle/modeling_llama_kv.py (无 CUDA 调用，无需修改)
+[x] US-3.3 修改 model/eagle/modeling_mixtral_kv.py (无 CUDA 调用，无需修改)
+[x] US-3.4 修改 evaluation/inference_eagle.py (无需修改)
+[x] 修改 model/eagle/utils.py (torch.cuda.synchronize -> device_synchronize)
+[x] 修改 model/eagle/utils_c.py (device 默认值)
+[x] 修改 model/eagle/utils_alpha.py (device 默认值)
+[x] Git commit: feat(npu): adapt EAGLE speculative decoding for NPU (b5c2240)
+
+Phase 4: 修复 NPU 设备加载问题
+---------------------------
+[x] 修改 evaluation/inference_baseline.py (NPU 不支持 device_map="auto")
+[x] 修改 evaluation/inference_eagle.py (NPU 不支持 device_map="auto")
+[x] 修改 evaluation/eval.py (修复 RuntimeError 处理)
+[x] Git commit: fix(npu): handle NPU device loading (9e49a97)
+
+最后更新: 2026-02-05
+
+=== 测试结果 ===
+
+1. Baseline 推理在 NPU (Ascend 910B) 上成功运行
+   - 模型: Meta-LLaMA-3-8B-Instruct
+   - 设备: npu:0
+   - 结果: #Mean accepted tokens: 1.0
+
+2. EAGLE 推理在 NPU (Ascend 910B) 上成功运行
+   - Base模型: Meta-LLaMA-3-8B-Instruct
+   - EA模型: EAGLE-LLaMA3-Instruct-8B
+   - 设备: npu:0
+   - 结果: #Mean accepted tokens: 1.64
+   - 加速效果: EAGLE (1.64) > Baseline (1.0)
+
+=== 全部完成 ===

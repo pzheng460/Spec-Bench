@@ -1,0 +1,98 @@
+{
+  "feature_name": "对Spec-Bench实现NPU适配",
+  "created_at": "2026-02-05",
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "公共层适配",
+      "description": "建立 NPU/CUDA 兼容的基础设施",
+      "user_stories": [
+        {
+          "id": "US-1.1",
+          "subject": "设备检测模块",
+          "description": "创建 evaluation/device_utils.py，实现 get_device() 和 get_device_synchronize() 函数",
+          "acceptance_criteria": "在 NPU 环境下 get_device() 返回 'npu'"
+        },
+        {
+          "id": "US-1.2",
+          "subject": "环境变量处理",
+          "description": "支持 ASCEND_VISIBLE_DEVICES 环境变量，兼容 CUDA_VISIBLE_DEVICES",
+          "acceptance_criteria": "设置 ASCEND_VISIBLE_DEVICES=0 后程序能正确识别"
+        }
+      ],
+      "commit_message": "feat(npu): add device detection and utility module"
+    },
+    {
+      "id": "phase-2",
+      "name": "Baseline 适配",
+      "description": "使基础推理流程在 NPU 上运行",
+      "user_stories": [
+        {
+          "id": "US-2.1",
+          "subject": "修改 evaluation/eval.py",
+          "description": "将 .to('cuda') 替换为 .to(device)，将 torch.cuda.synchronize() 替换为公共函数调用",
+          "acceptance_criteria": "python -m evaluation.inference_baseline 在 NPU 上能完成推理"
+        },
+        {
+          "id": "US-2.2",
+          "subject": "修改 evaluation/inference_baseline.py",
+          "description": "适配设备相关代码",
+          "acceptance_criteria": "生成的 jsonl 文件包含正确的推理结果"
+        }
+      ],
+      "commit_message": "feat(npu): adapt baseline inference for NPU"
+    },
+    {
+      "id": "phase-3",
+      "name": "EAGLE 适配",
+      "description": "使 EAGLE 投机解码在 NPU 上运行",
+      "user_stories": [
+        {
+          "id": "US-3.1",
+          "subject": "修改 model/eagle/ea_model.py",
+          "description": "适配设备相关代码，确保 KVCache 操作兼容 NPU",
+          "acceptance_criteria": "EAGLE 模型能在 NPU 上加载"
+        },
+        {
+          "id": "US-3.2",
+          "subject": "修改 model/eagle/modeling_llama_kv.py",
+          "description": "适配 attention 计算中的设备相关代码，确保 tree_mask 处理兼容 NPU",
+          "acceptance_criteria": "EAGLE 推理流程完整运行"
+        },
+        {
+          "id": "US-3.3",
+          "subject": "修改 model/eagle/modeling_mixtral_kv.py",
+          "description": "适配 MoE 路由计算，确保专家选择逻辑兼容 NPU",
+          "acceptance_criteria": "Mixtral 模型在 NPU 上能完成推理"
+        },
+        {
+          "id": "US-3.4",
+          "subject": "修改 evaluation/inference_eagle.py",
+          "description": "适配设备相关代码",
+          "acceptance_criteria": "python -m evaluation.inference_eagle 在 NPU 上能完成推理"
+        }
+      ],
+      "commit_message": "feat(npu): adapt EAGLE speculative decoding for NPU"
+    }
+  ],
+  "technical_spec": {
+    "npu_environment": {
+      "hardware": "Ascend 910B",
+      "software_stack": "CANN 8.x",
+      "python_library": "torch_npu"
+    },
+    "precision_support": ["float16", "bfloat16", "float32"],
+    "error_handling": "NPU 不可用时直接报错退出，不回退 CUDA",
+    "device_strategy": "运行时自动检测设备"
+  },
+  "git_workflow": {
+    "commit_format": "Conventional Commits",
+    "auto_push": false
+  },
+  "test_method": {
+    "remote_host": "192.168.0.180",
+    "remote_path": "/home/z00929669/Spec-Bench",
+    "container": "spec-bench",
+    "test_command": "sh run.sh"
+  }
+}
