@@ -1,10 +1,12 @@
 import copy
 import random
 
-# typing 
+# typing
 from typing import List, Tuple
 import time
 import torch
+
+from evaluation.device_utils import device_synchronize, get_device
 
 # TODO
 # from transformers import LlamaTokenizer
@@ -23,12 +25,12 @@ from transformers.generation.logits_process import (
 
 def timer(func):
     def wrapper(*args, **kwargs):
-        torch.cuda.synchronize()
+        device_synchronize()
         start = time.perf_counter()
 
         result = func(*args, **kwargs)
 
-        torch.cuda.synchronize()
+        device_synchronize()
         elapsed = time.perf_counter() - start
         print(f'{func.__name__} took {elapsed} seconds')
         return result
@@ -87,7 +89,9 @@ def pad_path(path: List[int], length: int, pad_value: int = -2) -> List[int]:
     return path + [pad_value] * (length - len(path))
 
 
-def generate_tree_buffers(tree_choices, device="cuda"):
+def generate_tree_buffers(tree_choices, device=None):
+    if device is None:
+        device = get_device()
     sorted_tree_choices = sorted(tree_choices, key=lambda x: (len(x), x))
     tree_len = len(sorted_tree_choices) + 1
 

@@ -3,6 +3,8 @@ import torch
 # typing
 from typing import List
 
+from evaluation.device_utils import get_device
+
 TOPK = 10  # topk for sparse tree
 
 
@@ -97,7 +99,9 @@ class Tree:
 
 
 
-def generate_tree_buffers(tree_choices, device="cuda"):
+def generate_tree_buffers(tree_choices, device=None):
+    if device is None:
+        device = get_device()
     tree=Tree(tree_choices)
     sorted_tree_choices = sorted(tree_choices, key=lambda x: (len(x), x))
     tree_len = tree.num_node_wchild()

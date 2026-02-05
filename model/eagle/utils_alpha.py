@@ -3,6 +3,8 @@ import random
 
 import torch
 
+from evaluation.device_utils import get_device
+
 # TODO
 # from transformers import LlamaTokenizer
 # tokenizer=LlamaTokenizer.from_pretrained("/home/lyh/weights/hf/vicuna_v13/7B/")
@@ -65,7 +67,9 @@ def pad_path(path, length, pad_value=-2):
     return path + [pad_value] * (length - len(path))
 
 
-def generate_tree_buffers(tree_choices, device="cuda"):
+def generate_tree_buffers(tree_choices, device=None):
+    if device is None:
+        device = get_device()
     sorted_tree_choices = sorted(tree_choices, key=lambda x: (len(x), x))
     tree_len = len(sorted_tree_choices) + 1
 
