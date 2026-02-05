@@ -45,20 +45,20 @@ def get_device() -> str:
         str: Device string ("npu", "cuda", or "cpu")
 
     Raises:
-        RuntimeError: If ASCEND_VISIBLE_DEVICES is set but NPU is not available,
+        RuntimeError: If ASCEND_RT_VISIBLE_DEVICES is set but NPU is not available,
                       or if CUDA_VISIBLE_DEVICES is set but CUDA is not available.
     """
     # Check environment variables for explicit device preference
-    ascend_devices = os.environ.get('ASCEND_VISIBLE_DEVICES')
+    ascend_devices = os.environ.get('ASCEND_RT_VISIBLE_DEVICES')
     cuda_devices = os.environ.get('CUDA_VISIBLE_DEVICES')
 
-    # If ASCEND_VISIBLE_DEVICES is set, expect NPU to be available
+    # If ASCEND_RT_VISIBLE_DEVICES is set, expect NPU to be available
     if ascend_devices is not None and ascend_devices != '':
         if is_npu_available():
             return "npu"
         else:
             raise RuntimeError(
-                f"ASCEND_VISIBLE_DEVICES is set to '{ascend_devices}' but NPU is not available. "
+                f"ASCEND_RT_VISIBLE_DEVICES is set to '{ascend_devices}' but NPU is not available. "
                 "Please check your torch_npu installation and CANN environment."
             )
 
@@ -86,9 +86,9 @@ def get_visible_devices() -> str:
     Get the visible devices environment variable value.
 
     Returns:
-        str: The value of ASCEND_VISIBLE_DEVICES or CUDA_VISIBLE_DEVICES
+        str: The value of ASCEND_RT_VISIBLE_DEVICES or CUDA_VISIBLE_DEVICES
     """
-    ascend_devices = os.environ.get('ASCEND_VISIBLE_DEVICES')
+    ascend_devices = os.environ.get('ASCEND_RT_VISIBLE_DEVICES')
     if ascend_devices is not None:
         return ascend_devices
     return os.environ.get('CUDA_VISIBLE_DEVICES', '')
@@ -186,6 +186,29 @@ def get_device_name(device_id: int = 0, device: str = None) -> str:
         return torch.cuda.get_device_name(device_id)
     else:
         return "CPU"
+
+
+def get_npu_device_map(max_memory_per_device: str = "60GiB") -> dict:
+    """
+    Generate a device map for multi-NPU model loading.
+
+    Uses the actual visible device count (respects ASCEND_RT_VISIBLE_DEVICES).
+
+    Args:
+        max_memory_per_device: Maximum memory per NPU device (e.g., "60GiB")
+
+    Returns:
+        dict: Device map with max_memory configuration
+    """
+    if is_npu_available():
+        import torch
+        # Get actual visible device count (respects ASCEND_RT_VISIBLE_DEVICES)
+        device_count = torch.npu.device_count()
+    else:
+        device_count = 0
+    max_memory = {i: max_memory_per_device for i in range(device_count)}
+    max_memory["cpu"] = "100GiB"
+    return max_memory
 
 
 # For convenience, export a default device at module load time

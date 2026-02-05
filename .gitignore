@@ -1,0 +1,7 @@
+.claude
+*.json
+*.jsonl
+*.log
+CLAUDE.md
+__pycache__/
+kernel_meta

@@ -54,11 +54,20 @@ Alongside the stable version, Spec-Bench now supports the latest transformers wi
 
 ## Installation
 
+Conda:
 ```
 conda create -n specbench python=3.12
 conda activate specbench
 cd Spec-Bench
 pip install -r requirements.txt
+```
+
+uv:
+```
+cd Spec-Bench
+uv venv --python 3.12
+source .venv/bin/activate
+uv pip install -r requirements.txt
 ```
 
 ## Model Weights

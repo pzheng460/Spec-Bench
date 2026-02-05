@@ -62,9 +62,9 @@ else:
 - 验收标准: 在 NPU 环境下 `get_device()` 返回 "npu"
 
 **用户故事 US-1.2**: 环境变量处理
-- 支持 `ASCEND_VISIBLE_DEVICES` 环境变量
+- 支持 `ASCEND_RT_VISIBLE_DEVICES` 环境变量
 - 兼容现有 `CUDA_VISIBLE_DEVICES` 处理逻辑
-- 验收标准: 设置 `ASCEND_VISIBLE_DEVICES=0` 后程序能正确识别
+- 验收标准: 设置 `ASCEND_RT_VISIBLE_DEVICES=0` 后程序能正确识别
 
 **Git Commit**: `feat(npu): add device detection and utility module`
 

@@ -7,7 +7,7 @@ import argparse
 from fastchat.utils import str_to_torch_dtype
 
 from evaluation.eval import run_eval, reorg_answer_file
-from evaluation.device_utils import get_device
+from evaluation.device_utils import get_device, get_device_count, get_npu_device_map
 
 from model.eagle.ea_model import EaModel
 from model.eagle.kv_cache import initialize_past_key_values
@@ -202,28 +202,24 @@ if __name__ == "__main__":
 
     print(f"Output to {answer_file}")
 
-    # Detect device and set appropriate loading strategy
+    # Detect device and configure loading
     device = get_device()
-    print(f"Detected device: {device}")
+    device_count = get_device_count(device)
+    print(f"Detected device: {device}, count: {device_count}")
 
-    if device == "npu":
-        # NPU doesn't support device_map="auto", load to CPU first then move
-        model = EaModel.from_pretrained(
-            base_model_path=args.base_model_path,
-            ea_model_path=args.ea_model_path,
-            torch_dtype=str_to_torch_dtype(args.dtype),
-            low_cpu_mem_usage=True,
-        )
-        model = model.to(device)
-    else:
-        # CUDA supports device_map="auto"
-        model = EaModel.from_pretrained(
-            base_model_path=args.base_model_path,
-            ea_model_path=args.ea_model_path,
-            torch_dtype=str_to_torch_dtype(args.dtype),
-            low_cpu_mem_usage=True,
-            device_map="auto"
-        )
+    # NPU requires explicit max_memory for device_map="auto" to work
+    max_memory = get_npu_device_map("60GiB") if device == "npu" else None
+    if max_memory:
+        print(f"NPU max_memory: {max_memory}")
+
+    model = EaModel.from_pretrained(
+        base_model_path=args.base_model_path,
+        ea_model_path=args.ea_model_path,
+        torch_dtype=str_to_torch_dtype(args.dtype),
+        low_cpu_mem_usage=True,
+        device_map="auto",
+        max_memory=max_memory,
+    )
 
     tokenizer = model.get_tokenizer()
 
