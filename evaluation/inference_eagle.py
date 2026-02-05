@@ -7,6 +7,7 @@ import argparse
 from fastchat.utils import str_to_torch_dtype
 
 from evaluation.eval import run_eval, reorg_answer_file
+from evaluation.device_utils import get_device
 
 from model.eagle.ea_model import EaModel
 from model.eagle.kv_cache import initialize_past_key_values
@@ -201,14 +202,28 @@ if __name__ == "__main__":
 
     print(f"Output to {answer_file}")
 
-    model = EaModel.from_pretrained(
-        base_model_path=args.base_model_path,
-        ea_model_path=args.ea_model_path,
-        torch_dtype=str_to_torch_dtype(args.dtype),
-        low_cpu_mem_usage=True,
-        # load_in_8bit=True,
-        device_map="auto"
-    )
+    # Detect device and set appropriate loading strategy
+    device = get_device()
+    print(f"Detected device: {device}")
+
+    if device == "npu":
+        # NPU doesn't support device_map="auto", load to CPU first then move
+        model = EaModel.from_pretrained(
+            base_model_path=args.base_model_path,
+            ea_model_path=args.ea_model_path,
+            torch_dtype=str_to_torch_dtype(args.dtype),
+            low_cpu_mem_usage=True,
+        )
+        model = model.to(device)
+    else:
+        # CUDA supports device_map="auto"
+        model = EaModel.from_pretrained(
+            base_model_path=args.base_model_path,
+            ea_model_path=args.ea_model_path,
+            torch_dtype=str_to_torch_dtype(args.dtype),
+            low_cpu_mem_usage=True,
+            device_map="auto"
+        )
 
     tokenizer = model.get_tokenizer()
 

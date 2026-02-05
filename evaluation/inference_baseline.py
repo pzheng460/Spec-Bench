@@ -7,6 +7,7 @@ import argparse
 from fastchat.utils import str_to_torch_dtype
 
 from evaluation.eval import run_eval, reorg_answer_file
+from evaluation.device_utils import get_device
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -96,12 +97,26 @@ if __name__ == "__main__":
 
     print(f"Output to {answer_file}")
 
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model_path,
-        torch_dtype=str_to_torch_dtype(args.dtype),
-        low_cpu_mem_usage=True,
-        device_map="auto"
-    )
+    # Detect device and set appropriate loading strategy
+    device = get_device()
+    print(f"Detected device: {device}")
+
+    if device == "npu":
+        # NPU doesn't support device_map="auto", load to CPU first then move
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_path,
+            torch_dtype=str_to_torch_dtype(args.dtype),
+            low_cpu_mem_usage=True,
+        )
+        model = model.to(device)
+    else:
+        # CUDA supports device_map="auto"
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_path,
+            torch_dtype=str_to_torch_dtype(args.dtype),
+            low_cpu_mem_usage=True,
+            device_map="auto"
+        )
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
 

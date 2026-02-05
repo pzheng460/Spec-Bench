@@ -152,6 +152,9 @@ def get_model_answers(
             except RuntimeError as e:
                 print("ERROR question ID: ", question["question_id"])
                 output = "ERROR"
+                new_token = 0
+                step = 0
+                total_time = 0.0
 
             turns.append(output)
             steps.append(int(step))
@@ -223,6 +226,10 @@ def get_model_answers(
                 except RuntimeError as e:
                     print("ERROR question ID: ", question["question_id"])
                     output = "ERROR"
+                    new_token = 0
+                    step = 0
+                    total_time = 0.0
+                    accept_length_tree = []
 
                 turns.append(output)
                 steps.append(int(step))
