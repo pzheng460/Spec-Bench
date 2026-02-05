@@ -16,6 +16,8 @@ from fastchat.llm_judge.common import load_questions
 from fastchat.model import get_conversation_template
 from tqdm import tqdm
 
+from evaluation.device_utils import get_device, get_visible_devices, device_synchronize
+
 
 def run_eval(
         model,
@@ -84,8 +86,11 @@ def get_model_answers(
     model.eval()
     print('Check model training state:', model.training)
 
-    cuda_visible_devices = os.environ.get('CUDA_VISIBLE_DEVICES')
-    print('CUDA VISIBLE DEVICES:', cuda_visible_devices)
+    # Get device and visible devices info
+    device = get_device()
+    visible_devices = get_visible_devices()
+    print(f'Using device: {device}')
+    print(f'Visible devices: {visible_devices}')
 
     question = questions[0]
 
@@ -103,10 +108,10 @@ def get_model_answers(
             conv.append_message(conv.roles[1], None)
             conv.stop_str = "</s>"
             prompt = conv.get_prompt()
-            inputs = tokenizer([prompt], return_tensors="pt").to("cuda")
+            inputs = tokenizer([prompt], return_tensors="pt").to(device)
             input_ids = inputs.input_ids
             try:
-                torch.cuda.synchronize()
+                device_synchronize(device)
                 start_time = time.time()
                 output_ids, new_token, step, accept_length_tree = forward_func(
                     inputs,
@@ -115,7 +120,7 @@ def get_model_answers(
                     max_new_tokens,
                     **kwargs,
                 )
-                torch.cuda.synchronize()
+                device_synchronize(device)
                 total_time = time.time() - start_time
                 output_ids = output_ids[0][len(input_ids[0]):]
                 # be consistent with the template's stop_token_ids
@@ -173,10 +178,10 @@ def get_model_answers(
                 conv.append_message(conv.roles[1], None)
                 conv.stop_str = "</s>"
                 prompt = conv.get_prompt()
-                inputs = tokenizer([prompt], return_tensors="pt").to("cuda")
+                inputs = tokenizer([prompt], return_tensors="pt").to(device)
                 input_ids = inputs.input_ids
                 try:
-                    torch.cuda.synchronize()
+                    device_synchronize(device)
                     start_time = time.time()
                     output_ids, new_token, step, accept_length_tree = forward_func(
                         inputs,
@@ -185,7 +190,7 @@ def get_model_answers(
                         max_new_tokens,
                         **kwargs,
                     )
-                    torch.cuda.synchronize()
+                    device_synchronize(device)
                     total_time = time.time() - start_time
                     accept_lengths_tree.extend(accept_length_tree)
                     output_ids = output_ids[0][len(input_ids[0]):]
