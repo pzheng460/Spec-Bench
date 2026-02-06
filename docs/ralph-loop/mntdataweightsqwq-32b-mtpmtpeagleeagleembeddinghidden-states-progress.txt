@@ -1,0 +1,46 @@
+# MTP Model Adaptation - Implementation Progress
+
+## Phases
+
+### Phase 1: Core Infrastructure
+[COMPLETED] US-1: Create KVQwen2ForCausalLM Base Model
+[COMPLETED] US-2: Implement MTP Layer Architecture
+[COMPLETED] US-3: Implement MTP Model Wrapper
+
+### Phase 2: Speculative Decoding
+[COMPLETED] US-4: Implement Tree-based Candidate Generation
+[COMPLETED] US-5: Implement Verification and Acceptance
+
+### Phase 3: Integration
+[COMPLETED] US-6: Create MTP Inference Script
+[COMPLETED] US-7: Multi-Device Support
+
+## Status Legend
+[PENDING] - Not started
+[IN_PROGRESS] - Currently being worked on
+[COMPLETED] - Done and verified
+[BLOCKED] - Waiting on dependency
+
+## Files Created
+- model/mtp/__init__.py - Module initialization (exports MTPQwen2Model, MTPModel alias)
+- model/mtp/configs.py - MTPConfig class
+- model/mtp/cnets.py - MTP layer architecture (MTPDraftModel, MTPLayer)
+- model/mtp/kv_cache.py - KV-cache management
+- model/mtp/utils_c.py - Tree buffer generation
+- model/mtp/modeling_qwen2_kv.py - KVQwen2ForCausalLM
+- model/mtp/mtp_qwen2_model.py - MTPQwen2Model main wrapper (Qwen2-specific)
+- model/mtp/utils.py - Utility functions for speculative decoding
+- evaluation/inference_mtp.py - MTP inference script for benchmarks
+
+## Notes
+- Implementation is independent from EAGLE code
+- All new files in model/mtp/ directory
+- Inference script follows same pattern as inference_eagle.py
+- Supports MT-bench, HumanEval, GSM8K, Alpaca benchmarks via run_eval
+
+## Verification
+- Model loading: PASSED
+- Forward pass: PASSED
+- MTP speculative decoding: PASSED
+- Mean accepted tokens: 2.66 (on spec_bench test)
+- Inference script: PASSED
