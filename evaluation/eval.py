@@ -82,6 +82,10 @@ def get_model_answers(
         num_choices,
         **kwargs,
 ):
+    # Extract custom prompt builder and stop tokens if provided
+    prompt_func = kwargs.pop("prompt_func", None)
+    stop_token_ids = kwargs.pop("stop_token_ids", None)
+    stop_str = kwargs.pop("stop_str", None)
 
     model.eval()
     print('Check model training state:', model.training)
@@ -94,74 +98,78 @@ def get_model_answers(
 
     question = questions[0]
 
-    # warmup
-    for _ in range(3):
-        torch.manual_seed(0)
-        conv = get_conversation_template("vicuna")
-        turns = []
-        steps = []
-        new_tokens = []
-        wall_time = []
-        for j in range(len(question["turns"])):
-            qs = question["turns"][j]
-            conv.append_message(conv.roles[0], qs)
-            conv.append_message(conv.roles[1], None)
+    def _build_prompt_and_generate(question_turns, j, previous_outputs, **gen_kwargs):
+        """Build prompt for turn j and generate."""
+        if prompt_func is not None:
+            prompt = prompt_func(question_turns, j, previous_outputs)
+            # Avoid double BOS: if template already includes BOS token, skip auto-adding it
+            bos = getattr(tokenizer, "bos_token", None)
+            add_special = not (bos and prompt.startswith(bos))
+            inputs = tokenizer([prompt], return_tensors="pt", add_special_tokens=add_special).to(device)
+        else:
+            conv = get_conversation_template("vicuna")
+            for t in range(j + 1):
+                conv.append_message(conv.roles[0], question_turns[t])
+                if t < j:
+                    conv.append_message(conv.roles[1], previous_outputs[t])
+                else:
+                    conv.append_message(conv.roles[1], None)
             conv.stop_str = "</s>"
             prompt = conv.get_prompt()
             inputs = tokenizer([prompt], return_tensors="pt").to(device)
-            input_ids = inputs.input_ids
-            try:
-                device_synchronize(device)
-                start_time = time.time()
-                output_ids, new_token, step, accept_length_tree = forward_func(
-                    inputs,
-                    model,
-                    tokenizer,
-                    max_new_tokens,
-                    **kwargs,
-                )
-                device_synchronize(device)
-                total_time = time.time() - start_time
-                output_ids = output_ids[0][len(input_ids[0]):]
-                # be consistent with the template's stop_token_ids
-                if conv.stop_token_ids:
-                    stop_token_ids_index = [
-                        i
-                        for i, id in enumerate(output_ids)
-                        if id in conv.stop_token_ids
-                    ]
-                    if len(stop_token_ids_index) > 0:
-                        output_ids = output_ids[: stop_token_ids_index[0]]
+        return inputs
 
-                output = tokenizer.decode(
-                    output_ids,
-                    spaces_between_special_tokens=False,
-                )
-                if conv.stop_str and output.find(conv.stop_str) > 0:
-                    output = output[: output.find(conv.stop_str)]
-                for special_token in tokenizer.special_tokens_map.values():
-                    if isinstance(special_token, list):
-                        for special_tok in special_token:
-                            output = output.replace(special_tok, "")
-                    else:
-                        output = output.replace(special_token, "")
-                output = output.strip()
+    def _post_process_output(output_ids, input_len):
+        """Post-process generated output tokens."""
+        output_ids = output_ids[0][input_len:]
 
-                if conv.name == "xgen" and output.startswith("Assistant:"):
-                    output = output.replace("Assistant:", "", 1).strip()
-            except RuntimeError as e:
-                print("ERROR question ID: ", question["question_id"])
-                output = "ERROR"
-                new_token = 0
-                step = 0
-                total_time = 0.0
+        # Stop at stop_token_ids
+        effective_stop_ids = stop_token_ids
+        if effective_stop_ids is None and prompt_func is None:
+            conv = get_conversation_template("vicuna")
+            effective_stop_ids = conv.stop_token_ids
+        if effective_stop_ids:
+            stop_idx = [
+                i for i, tid in enumerate(output_ids) if tid in effective_stop_ids
+            ]
+            if len(stop_idx) > 0:
+                output_ids = output_ids[: stop_idx[0]]
 
-            turns.append(output)
-            steps.append(int(step))
-            new_tokens.append(int(new_token))
-            wall_time.append(total_time)
-            conv.messages[-1][-1] = output
-    print('Warmup done')
+        output = tokenizer.decode(output_ids, spaces_between_special_tokens=False)
+
+        # Stop at stop_str
+        effective_stop_str = stop_str
+        if effective_stop_str is None and prompt_func is None:
+            effective_stop_str = "</s>"
+        if effective_stop_str and output.find(effective_stop_str) > 0:
+            output = output[: output.find(effective_stop_str)]
+
+        # Remove special tokens
+        for special_token in tokenizer.special_tokens_map.values():
+            if isinstance(special_token, list):
+                for special_tok in special_token:
+                    output = output.replace(special_tok, "")
+            else:
+                output = output.replace(special_token, "")
+        output = output.strip()
+
+        if prompt_func is None:
+            conv = get_conversation_template("vicuna")
+            if conv.name == "xgen" and output.startswith("Assistant:"):
+                output = output.replace("Assistant:", "", 1).strip()
+
+        return output
+
+    # warmup — single prefill + 1 decode step only
+    print("Warmup...")
+    torch.manual_seed(0)
+    inputs = _build_prompt_and_generate(question["turns"], 0, [])
+    warmup_kwargs = dict(kwargs)
+    warmup_kwargs.pop("verbose", None)
+    device_synchronize(device)
+    _, _, _, _ = forward_func(inputs, model, tokenizer, 1, **warmup_kwargs)  # max_new_tokens=1
+    device_synchronize(device)
+    print("Warmup done")
 
     accept_lengths_tree = []
     for question in tqdm(questions):
@@ -170,18 +178,12 @@ def get_model_answers(
         for i in range(num_choices):
             cur_accept_lengths_tree = []
             torch.manual_seed(i)
-            conv = get_conversation_template("vicuna")
             turns = []
             steps = []
             new_tokens = []
             wall_time = []
             for j in range(len(question["turns"])):
-                qs = question["turns"][j]
-                conv.append_message(conv.roles[0], qs)
-                conv.append_message(conv.roles[1], None)
-                conv.stop_str = "</s>"
-                prompt = conv.get_prompt()
-                inputs = tokenizer([prompt], return_tensors="pt").to(device)
+                inputs = _build_prompt_and_generate(question["turns"], j, turns)
                 input_ids = inputs.input_ids
                 try:
                     device_synchronize(device)
@@ -196,35 +198,9 @@ def get_model_answers(
                     device_synchronize(device)
                     total_time = time.time() - start_time
                     accept_lengths_tree.extend(accept_length_tree)
-                    output_ids = output_ids[0][len(input_ids[0]):]
-
-                    if conv.stop_token_ids:
-                        stop_token_ids_index = [
-                            i
-                            for i, id in enumerate(output_ids)
-                            if id in conv.stop_token_ids
-                        ]
-                        if len(stop_token_ids_index) > 0:
-                            output_ids = output_ids[: stop_token_ids_index[0]]
-
-                    output = tokenizer.decode(
-                        output_ids,
-                        spaces_between_special_tokens=False,
-                    )
-                    if conv.stop_str and output.find(conv.stop_str) > 0:
-                        output = output[: output.find(conv.stop_str)]
-                    for special_token in tokenizer.special_tokens_map.values():
-                        if isinstance(special_token, list):
-                            for special_tok in special_token:
-                                output = output.replace(special_tok, "")
-                        else:
-                            output = output.replace(special_token, "")
-                    output = output.strip()
-
-                    if conv.name == "xgen" and output.startswith("Assistant:"):
-                        output = output.replace("Assistant:", "", 1).strip()
+                    output = _post_process_output(output_ids, len(input_ids[0]))
                 except RuntimeError as e:
-                    print("ERROR question ID: ", question["question_id"])
+                    print(f"ERROR question ID: {question['question_id']}, turn {j}: {e}")
                     output = "ERROR"
                     new_token = 0
                     step = 0
@@ -236,7 +212,6 @@ def get_model_answers(
                 new_tokens.append(int(new_token))
                 wall_time.append(total_time)
                 cur_accept_lengths_tree.extend(accept_length_tree)
-                conv.messages[-1][-1] = output
             # torch.cuda.empty_cache()
             choices.append({"index": i, "turns": turns, "decoding_steps": steps, "new_tokens": new_tokens, "wall_time": wall_time,
                             "accept_lengths": cur_accept_lengths_tree})

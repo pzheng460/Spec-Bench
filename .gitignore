@@ -5,3 +5,5 @@
 CLAUDE.md
 __pycache__/
 kernel_meta
+ref/
+debug*.py

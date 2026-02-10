@@ -1,0 +1,22 @@
+# OpenPanGu & OpenPanGu MTP Adaptation - Progress
+
+## Phase 1: Foundation
+- [DONE] US-4: Implement PanGu MTP config (model/pangu/configs.py)
+- [DONE] US-5: Implement PanGu KV cache (model/pangu/kv_cache.py)
+
+## Phase 2: Base Model
+- [DONE] US-1: Implement KV-cache-optimized PanGu base model (model/pangu/modeling_pangu_kv.py)
+  - Fixed sandwich norm bug in PanguDecoderLayer.forward()
+
+## Phase 3: MTP Draft
+- [DONE] US-2: Implement PanGu MTP draft model (model/pangu/cnets.py)
+  - PanguMTPLayer with full Sink Attention + MoE decoder
+  - PanguMTPDraftModel with tree-based speculative decoding
+- [DONE] US-3: Implement MTPPanguModel wrapper (model/pangu/mtp_pangu_model.py)
+  - Weight loading from model.layers.50.* with correct mapping
+  - Dual-path loading (base layers 0-49 + MTP layer 50)
+
+## Phase 4: Inference Scripts
+- [DONE] US-6: Create inference_pangu_mtp.py (evaluation/inference_pangu_mtp.py)
+- [DONE] US-7: Create inference_pangu_baseline.py (evaluation/inference_pangu_baseline.py)
+- [DONE] US-8: Update run.sh for PanGu (run.sh)

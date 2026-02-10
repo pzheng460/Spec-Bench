@@ -377,10 +377,16 @@ def update_inference_inputs(
         dim=-1
     )
 
-    # Update past key values
-    for past_key_values_data in past_key_values_data_list:
-        tgt = past_key_values_data[..., select_indices.to(past_key_values_data.device), :]
-        dst = past_key_values_data[..., prev_input_len: prev_input_len + tgt.shape[-2], :]
+    # Update past key values (each entry is a (k_data, v_data) tuple for asymmetric KV)
+    for kv_pair in past_key_values_data_list:
+        k_data, v_data = kv_pair
+        # Update K cache
+        tgt = k_data[..., select_indices.to(k_data.device), :]
+        dst = k_data[..., prev_input_len: prev_input_len + tgt.shape[-2], :]
+        dst.copy_(tgt, non_blocking=True)
+        # Update V cache
+        tgt = v_data[..., select_indices.to(v_data.device), :]
+        dst = v_data[..., prev_input_len: prev_input_len + tgt.shape[-2], :]
         dst.copy_(tgt, non_blocking=True)
 
     current_length_data.fill_(prev_input_len + tgt.shape[-2])

@@ -24,12 +24,33 @@ pkill -9 python*
 #       --question-begin 0 \
 #       --question-end 1 2>&1 | tee server_0.log
 
-CUDA_VISIBLE_DEVICES=0,1 python -m evaluation.inference_mtp \
-      --base-model-path /mnt/data/weights/QwQ-32B/ \
-      --mtp-model-path /mnt/data/weights/qwq-32b-mtp/ \
-      --model-id qwq-32b-mtp \
+# CUDA_VISIBLE_DEVICES=0,1 python -m evaluation.inference_mtp \
+#       --base-model-path /mnt/data/weights/QwQ-32B/ \
+#       --mtp-model-path /mnt/data/weights/qwq-32b-mtp/ \
+#       --model-id qwq-32b-mtp \
+#       --bench-name spec_bench \
+#       --dtype bfloat16 \
+#       --temperature 0.0 \
+#       --question-begin 0 \
+#       --question-end 1 2>&1 | tee server_0.log
+
+# ---- OpenPanGu MTP Speculative Decoding ----
+CUDA_VISIBLE_DEVICES=0,1,3,5 python -m evaluation.inference_mtp \
+      --base-model-path /mnt/data/weights/openPangu-R-72B-2512/ \
+      --mtp-model-path /mnt/data/weights/openPangu-R-72B-2512/ \
+      --model-id openpangu-72b-mtp \
       --bench-name spec_bench \
       --dtype bfloat16 \
       --temperature 0.0 \
       --question-begin 0 \
-      --question-end 1 2>&1 | tee server_0.log
+      --question-end 1 2>&1 | tee pangu_mtp.log
+
+# ---- OpenPanGu Baseline (Autoregressive) ----
+# CUDA_VISIBLE_DEVICES=0,1,3,5 python -m evaluation.inference_pangu_baseline \
+#       --model-path /mnt/data/weights/openPangu-R-72B-2512/ \
+#       --model-id openpangu-72b-baseline \
+#       --bench-name spec_bench \
+#       --dtype bfloat16 \
+#       --temperature 0.0 \
+#       --question-begin 0 \
+#       --question-end 1 2>&1 | tee pangu_baseline.log
