@@ -35,9 +35,9 @@ pkill -9 python*
 #       --question-end 1 2>&1 | tee server_0.log
 
 # ---- OpenPanGu MTP Speculative Decoding ----
-CUDA_VISIBLE_DEVICES=0,1,3,5 python -m evaluation.inference_mtp \
-      --base-model-path /mnt/data/weights/openPangu-R-72B-2512/ \
-      --mtp-model-path /mnt/data/weights/openPangu-R-72B-2512/ \
+CUDA_VISIBLE_DEVICES=4,5,6,7 python -m evaluation.inference_pangu_mtp \
+      --base-model-path /data0/weights/openPangu-R-72B-2512/ \
+      --mtp-model-path /data0/weights/openPangu-R-72B-2512/ \
       --model-id openpangu-72b-mtp \
       --bench-name spec_bench \
       --dtype bfloat16 \
@@ -46,7 +46,7 @@ CUDA_VISIBLE_DEVICES=0,1,3,5 python -m evaluation.inference_mtp \
       --question-end 1 2>&1 | tee pangu_mtp.log
 
 # ---- OpenPanGu Baseline (Autoregressive) ----
-# CUDA_VISIBLE_DEVICES=0,1,3,5 python -m evaluation.inference_pangu_baseline \
+# CUDA_VISIBLE_DEVICES=4,5,6,7 python -m evaluation.inference_pangu_baseline \
 #       --model-path /mnt/data/weights/openPangu-R-72B-2512/ \
 #       --model-id openpangu-72b-baseline \
 #       --bench-name spec_bench \

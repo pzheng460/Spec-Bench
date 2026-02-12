@@ -406,18 +406,39 @@ class PanguMoE(nn.Module):
         # Scale
         topk_weights = topk_weights * self.routed_scaling_factor
 
-        # Compute expert outputs — only iterate over selected experts
-        final_hidden = torch.zeros_like(hidden_states_flat)
-        selected_experts = topk_indices.unique().tolist()
-        for i in selected_experts:
-            expert_mask = (topk_indices == i).any(dim=-1)
-            expert_input = hidden_states_flat[expert_mask]
-            expert_output = self.experts[i](expert_input)
+        # Compute expert outputs (Mixtral-style one_hot + index_add_)
+        topk_weights = topk_weights.to(hidden_states_flat.dtype)
 
-            # Get weights for this expert
-            weight_mask = (topk_indices == i)
-            expert_weights = (topk_weights * weight_mask.float()).sum(dim=-1)
-            final_hidden[expert_mask] += expert_output * expert_weights[expert_mask].unsqueeze(-1)
+        final_hidden = torch.zeros(
+            (batch_size * seq_len, hidden_dim),
+            dtype=hidden_states_flat.dtype,
+            device=hidden_states_flat.device,
+        )
+
+        # One-hot encode selected experts to create an expert mask
+        # expert_mask shape: (n_routed_experts, num_experts_per_tok, batch*seq)
+        expert_mask = torch.nn.functional.one_hot(
+            topk_indices, num_classes=self.n_routed_experts
+        ).permute(2, 1, 0)
+
+        for expert_idx in range(self.n_routed_experts):
+            expert_layer = self.experts[expert_idx]
+            idx, top_x = torch.where(expert_mask[expert_idx])
+
+            if top_x.shape[0] == 0:
+                continue
+
+            # In torch it is faster to index using lists than torch tensors
+            top_x_list = top_x.tolist()
+            idx_list = idx.tolist()
+
+            current_state = hidden_states_flat[None, top_x_list].reshape(-1, hidden_dim)
+            current_hidden_states = expert_layer(current_state)
+            current_hidden_states = current_hidden_states * topk_weights[top_x_list, idx_list, None]
+
+            final_hidden.index_add_(
+                0, top_x, current_hidden_states.to(hidden_states_flat.dtype)
+            )
 
         # Add shared expert output
         if self.n_shared_experts > 0:
